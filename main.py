@@ -29,17 +29,19 @@ class uutrack_reader:
         self.counter = 0
         self.received_ble = bytearray()
         self.semaphore = asyncio.Semaphore(1)
-        self.storage = []
+        self.storage = []         
+        self.amountBytes = 0    
 
     async def notification_handler(self, sender, data : bytearray):        
 
         self.counter +=1
         self.received_ble.extend(data)
+        if(self.counter == 0):
+            self.amountBytes = int.from_bytes(data[0:2], "little")
  
-        if(self.counter == 4):
-            server2 = motion_pb2.HourlyResult()
-            amountBytes = int.from_bytes(self.received_ble[0:2], "little")
-            server2.ParseFromString(self.received_ble[2:amountBytes+2])
+        if len(self.received_ble) >= self.amountBytes:
+            server2 = motion_pb2.HourlyResult()            
+            server2.ParseFromString(self.received_ble[2:self.amountBytes+2])
             self.storage.append(datetime.fromtimestamp(server2.UnixTime, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S'))
             self.storage.extend([str(item) for item in server2.AvgMinuteList])
             self.counter = 0
@@ -89,7 +91,7 @@ class datacollector:
         devices = await BleakScanner.discover()
         for d in devices:
             #print(d)
-            if(d.name == "UU_tracker"):            
+            if(d.name == "UU_tracker_DEBUG" or d.name == "UU_tracker"):            
                 print(f'device found:{d}')
                 the_reader = uutrack_reader()
                 await the_reader.makeconnectiontodevice(d)
